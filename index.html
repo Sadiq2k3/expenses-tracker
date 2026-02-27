@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Style Expense Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        /* Notion-Inspired Minimalist Theme */
+        :root {
+            --bg: #ffffff; 
+            --card-bg: #ffffff;
+            --text-main: #37352f; 
+            --text-muted: #787774; 
+            --border-color: #e9e9e7; 
+            --input-border: rgba(55, 53, 47, 0.16);
+            --input-bg: #ffffff;
+            --hover-bg: #f1f1ef;
+            
+            --primary: #2eaadc; 
+            --primary-hover: #069efc;
+            --success: #0f7b6c; 
+            --danger: #e03e3e; 
+            --warning: #d9730d; 
+            --purple: #6940a5; 
+            
+            --radius: 4px; 
+        }
+
+        [data-theme="dark"] {
+            --bg: #191919; 
+            --card-bg: #191919; 
+            --text-main: rgba(255, 255, 255, 0.81); 
+            --text-muted: rgba(255, 255, 255, 0.4); 
+            --border-color: #373737; 
+            --input-border: rgba(255, 255, 255, 0.13);
+            --input-bg: #191919;
+            --hover-bg: #2f2f2f;
+
+            --primary: #2eaadc; 
+            --success: #448361;
+            --danger: #e03e3e; 
+            --purple: #9a6dd7;
+        }
+
+        body {
+            font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            transition: background-color 0.2s ease, color 0.2s ease;
+            line-height: 1.5;
+        }
+
+        .container { max-width: 1100px; margin: 0 auto; }
+
+        /* Header Styling */
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 32px; 
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header h1 { 
+            margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+        }
+        .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+        /* Inputs & Forms */
+        input, select {
+            width: 100%; padding: 6px 10px; 
+            border: 1px solid var(--input-border); 
+            border-radius: var(--radius); box-sizing: border-box; font-size: 14px;
+            background-color: var(--input-bg); color: var(--text-main);
+            font-family: inherit; transition: border-color 0.1s ease, background-color 0.1s ease;
+            box-shadow: rgba(15, 15, 15, 0.05) 0px 1px 2px 0px inset;
+        }
+        input:focus, select:focus {
+            outline: none; border-color: var(--primary); background-color: var(--bg);
+        }
+        .currency-picker { width: auto; cursor: pointer; }
+        .search-bar { margin-bottom: 24px; }
+
+        /* Buttons */
+        .btn, .btn-action, .theme-toggle {
+            padding: 6px 12px; border: 1px solid transparent; border-radius: var(--radius); cursor: pointer; 
+            font-size: 14px; font-weight: 500; transition: all 0.1s ease;
+            font-family: inherit; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .btn-primary { 
+            background-color: var(--text-main); color: var(--bg);
+            width: 100%; font-size: 14px; padding: 8px 14px; margin-top: 8px;
+        }
+        .btn-primary:hover { opacity: 0.9; }
+
+        .btn-info, .theme-toggle { 
+            background-color: var(--bg); color: var(--text-main); border: 1px solid var(--input-border); 
+        }
+        .btn-info:hover, .theme-toggle:hover { background-color: var(--hover-bg); }
+
+        /* Custom Calendar Popover */
+        .custom-month-picker-container { position: relative; display: inline-block; }
+        .custom-month-picker-btn {
+            padding: 6px 12px; font-size: 13px; font-weight: 500;
+            background: var(--input-bg); border: 1px solid var(--input-border);
+            border-radius: var(--radius); color: var(--text-main); cursor: pointer;
+            display: flex; align-items: center; gap: 8px; font-family: inherit;
+            box-shadow: rgba(15, 15, 15, 0.05) 0px 1px 2px 0px inset;
+            transition: all 0.1s ease;
+        }
+        .custom-month-picker-btn:hover { background: var(--hover-bg); }
+        .custom-month-picker-popover {
+            position: absolute; top: calc(100% + 4px); right: 0;
+            background: var(--bg); border: 1px solid var(--border-color);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1); border-radius: 8px;
+            padding: 16px; width: 260px; z-index: 100; display: none;
+        }
+        [data-theme="dark"] .custom-month-picker-popover { box-shadow: 0 4px 16px rgba(0,0,0,0.6); }
+        .custom-month-picker-popover.show { display: block; }
+        
+        .picker-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .picker-year { font-weight: 600; font-size: 14px; color: var(--text-main); }
+        .picker-nav { display: flex; gap: 4px; }
+        .picker-nav button {
+            background: transparent; border: none; cursor: pointer; color: var(--text-muted);
+            border-radius: 4px; padding: 4px 8px; font-size: 14px; font-weight: bold;
+        }
+        .picker-nav button:hover:not(:disabled) { background: var(--hover-bg); color: var(--text-main); }
+        .picker-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+        
+        .picker-months-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 6px; }
+        .picker-month-btn {
+            background: transparent; border: none; padding: 8px 0; border-radius: 20px;
+            cursor: pointer; color: var(--text-main); font-size: 12px; font-weight: 500;
+            text-align: center; font-family: inherit; transition: background 0.1s;
+        }
+        .picker-month-btn:hover:not(:disabled) { background: var(--hover-bg); }
+        .picker-month-btn.selected { 
+            background: rgba(46, 170, 220, 0.2); 
+            color: var(--primary); font-weight: 600; 
+        }
+        /* NEW: Disabled state styling */
+        .picker-month-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* Layouts */
+        .top-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 32px; margin-bottom: 32px; }
+
+        /* Summary Cards */
+        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+        .summary-card {
+            background: var(--bg); padding: 16px; border-radius: var(--radius); 
+            text-align: left; border: 1px solid var(--border-color); position: relative;
+        }
+        .summary-card h3 { 
+            margin: 0 0 4px; color: var(--text-muted); font-size: 12px; 
+            font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .summary-card p { margin: 0; font-size: 24px; font-weight: 700; }
+
+        /* Progress Bars */
+        .progress-container {
+            width: 100%; background-color: var(--hover-bg); border-radius: var(--radius); 
+            margin-top: 12px; height: 6px; overflow: hidden;
+        }
+        .progress-bar { height: 100%; width: 0%; transition: width 0.3s ease, background-color 0.3s ease; }
+        .card-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 12px; color: var(--text-muted);}
+        .action-link { 
+            background: none; border: none; color: var(--text-muted); cursor: pointer; 
+            padding: 2px 4px; font-size: 12px; font-weight: 500; border-radius: 3px;
+            transition: background 0.1s; font-family: inherit;
+        }
+        .action-link:hover { background: var(--hover-bg); color: var(--text-main); }
+
+        /* Main Sections */
+        .card { background: var(--bg); display: flex; flex-direction: column; }
+        .card h2 { 
+            margin-top: 0; border-bottom: 1px solid var(--border-color); 
+            padding-bottom: 12px; font-size: 16px; font-weight: 600; margin-bottom: 16px;
+        }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; color: var(--text-muted); }
+
+        /* Transaction List */
+        .transaction-list { list-style: none; padding: 0; margin: 0; max-height: 400px; overflow-y: auto; padding-right: 4px;}
+        .transaction-list::-webkit-scrollbar { width: 4px; }
+        .transaction-list::-webkit-scrollbar-track { background: transparent; }
+        .transaction-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        .transaction-list li {
+            padding: 12px 0; border-bottom: 1px solid var(--border-color); 
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .transaction-list li:last-child { border-bottom: none; }
+        .transaction-list li.income { border-left: 3px solid var(--success); padding-left: 12px; }
+        .transaction-list li.expense { border-left: 3px solid var(--border-color); padding-left: 12px; }
+        .delete-btn { 
+            background: transparent; color: var(--text-muted); border: none; 
+            padding: 4px 8px; border-radius: var(--radius); cursor: pointer; font-size: 12px; font-weight: 500;
+            transition: all 0.1s ease; font-family: inherit; opacity: 0;
+        }
+        .transaction-list li:hover .delete-btn { opacity: 1; }
+        .delete-btn:hover { background: rgba(224, 62, 62, 0.1); color: var(--danger); }
+
+        /* Charts Grid */
+        .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; margin-bottom: 32px;}
+        .chart-container { position: relative; height: 260px; width: 100%; flex-grow: 1; margin-top: 10px; }
+
+        @media (max-width: 1024px) {
+            .top-layout, .charts-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; gap: 16px; align-items: flex-start; }
+            .controls { justify-content: flex-start; }
+            .transaction-list li .delete-btn { opacity: 1; } 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>Expense Tracker</h1>
+            <div class="controls">
+                <button onclick="toggleTheme()" class="theme-toggle" id="themeBtn">Dark Mode</button>
+                
+                <div style="display: flex; gap: 8px;">
+                    <input type="file" id="importCsv" accept=".csv" style="display: none;">
+                    <button onclick="document.getElementById('importCsv').click()" class="btn btn-info btn-action">Import</button>
+                    <button onclick="downloadExcel()" class="btn btn-info btn-action">Export</button>
+                </div>
+                
+                <select id="currency" class="currency-picker" style="padding: 6px 10px; font-size: 13px;">
+                    <option value="₹">₹ INR</option>
+                    <option value="$">$ USD</option>
+                    <option value="€">€ EUR</option>
+                    <option value="£">£ GBP</option>
+                </select>
+
+                <div id="monthFilterContainer"></div>
+                <input type="hidden" id="monthFilter">
+            </div>
+        </div>
+
+        <div class="top-layout">
+            <div class="card">
+                <h2>Add Transaction</h2>
+                <form id="tracker-form">
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select id="type">
+                            <option value="expense">Expense</option>
+                            <option value="income">Income</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="category">
+                            <option value="Food">Food & Dining</option>
+                            <option value="Rent">Rent & Utilities</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Salary">Salary (Income)</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label id="amount-label">Amount</label>
+                        <input type="number" id="amount" required min="0.01" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="description" required placeholder="E.g., Netflix subscription">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Transaction</button>
+                </form>
+            </div>
+
+            <div style="display: flex; flex-direction: column;">
+                <div class="summary-cards">
+                    <div class="summary-card">
+                        <h3>Net Balance</h3>
+                        <p id="net-balance">0.00</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Income</h3>
+                        <p id="total-income" style="color: var(--success);">+0.00</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Expenses</h3>
+                        <p id="total-expense" style="color: var(--danger);">-0.00</p>
+                    </div>
+                    
+                    <div class="summary-card">
+                        <h3>Monthly Budget</h3>
+                        <p id="budget-display">0.00</p>
+                        <div class="progress-container"><div class="progress-bar" id="budget-bar"></div></div>
+                        <div class="card-controls">
+                            <span id="budget-status">0% used</span>
+                            <button onclick="setBudget()" class="action-link">Edit Limit</button>
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <h3 id="goal-name-display">Savings Goal</h3>
+                        <p id="goal-display" style="font-size: 18px;">0 / 0</p>
+                        <div class="progress-container"><div class="progress-bar" id="goal-bar" style="background-color: var(--primary);"></div></div>
+                        <div class="card-controls">
+                            <span id="goal-status">0%</span>
+                            <div>
+                                <button onclick="addSavings()" class="action-link" style="margin-right: 5px;">+ Add</button>
+                                <button onclick="editGoal()" class="action-link" style="margin-right: 5px;">Edit</button>
+                                <button onclick="resetGoal()" class="action-link" style="color: var(--danger);">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="flex-grow: 1;">
+                    <h2>Transactions for <span id="display-month"></span></h2>
+                    <input type="text" id="searchInput" class="search-bar" placeholder="Search by name or category..." onkeyup="updateUI()">
+                    <ul id="transaction-list" class="transaction-list"></ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="card">
+                <h2>1. Category Breakdown</h2>
+                <div class="chart-container"><canvas id="categoryChart"></canvas></div>
+            </div>
+            <div class="card">
+                <h2>2. Daily Expense Trend</h2>
+                <div class="chart-container"><canvas id="dailyChart"></canvas></div>
+            </div>
+            <div class="card">
+                <h2>3. Cash Flow Ratio</h2>
+                <div class="chart-container"><canvas id="ratioChart"></canvas></div>
+            </div>
+            <div class="card">
+                <h2>4. Historical Comparison</h2>
+                <div class="chart-container"><canvas id="historicalChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 40px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h2 style="margin: 0; border: none; padding: 0;">5. Custom Month Tracker (<span id="customMonthName"></span>)</h2>
+                
+                <div id="customMonthFilterContainer"></div>
+                <input type="hidden" id="customMonthFilter">
+            </div>
+            <div class="chart-container" style="height: 350px;">
+                <canvas id="customMonthChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Custom Month Picker Logic ---
+        function attachCustomPicker(containerId, inputId) {
+            const container = document.getElementById(containerId);
+            const input = document.getElementById(inputId);
+            
+            container.classList.add('custom-month-picker-container');
+            
+            const uiHTML = `
+                <button class="custom-month-picker-btn" type="button">
+                    <span class="btn-text"></span> ▾
+                </button>
+                <div class="custom-month-picker-popover">
+                    <div class="picker-header">
+                        <span class="picker-year"></span>
+                        <div class="picker-nav">
+                            <button class="prev-y" type="button">&lt;</button>
+                            <button class="next-y" type="button">&gt;</button>
+                        </div>
+                    </div>
+                    <div class="picker-months-grid"></div>
+                </div>
+            `;
+            container.innerHTML = uiHTML;
+
+            const btn = container.querySelector('.custom-month-picker-btn');
+            const btnText = container.querySelector('.btn-text');
+            const popover = container.querySelector('.custom-month-picker-popover');
+            const yearDisplay = container.querySelector('.picker-year');
+            const grid = container.querySelector('.picker-months-grid');
+            const prevYBtn = container.querySelector('.prev-y');
+            const nextYBtn = container.querySelector('.next-y');
+
+            const monthNamesShort = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+            const monthNamesLong = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+            let viewYear = parseInt(input.value.split('-')[0]);
+
+            function render() {
+                // Get the real current date to prevent future selection
+                const todayReal = new Date();
+                const maxYear = todayReal.getFullYear();
+                const maxMonth = todayReal.getMonth() + 1; // 1-12
+
+                let currentYear = parseInt(input.value.split('-')[0]);
+                let currentMonth = parseInt(input.value.split('-')[1]);
+                
+                btnText.textContent = `${monthNamesLong[currentMonth - 1]} ${currentYear}`;
+                yearDisplay.textContent = viewYear;
+                grid.innerHTML = '';
+                
+                // Disable the "Next Year" button if viewing the current year
+                nextYBtn.disabled = (viewYear >= maxYear);
+                
+                monthNamesShort.forEach((m, index) => {
+                    const mBtn = document.createElement('button');
+                    mBtn.className = 'picker-month-btn';
+                    mBtn.type = 'button';
+                    mBtn.textContent = m;
+                    
+                    const btnMonth = index + 1;
+                    
+                    // NEW: Disable future months
+                    if (viewYear > maxYear || (viewYear === maxYear && btnMonth > maxMonth)) {
+                        mBtn.disabled = true;
+                    } else {
+                        if (viewYear === currentYear && btnMonth === currentMonth) {
+                            mBtn.classList.add('selected');
+                        }
+                        
+                        mBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            input.value = `${viewYear}-${String(btnMonth).padStart(2, '0')}`;
+                            popover.classList.remove('show');
+                            render();
+                            input.dispatchEvent(new Event('change')); // Trigger app updates
+                        };
+                    }
+                    
+                    grid.appendChild(mBtn);
+                });
+            }
+
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                viewYear = parseInt(input.value.split('-')[0]);
+                render();
+                // Close other open popovers
+                document.querySelectorAll('.custom-month-picker-popover').forEach(p => {
+                    if(p !== popover) p.classList.remove('show');
+                });
+                popover.classList.toggle('show');
+            };
+
+            prevYBtn.onclick = (e) => { e.stopPropagation(); viewYear--; render(); };
+            nextYBtn.onclick = (e) => { 
+                e.stopPropagation(); 
+                // Extra safety check so we can't increment past the max year
+                const maxYear = new Date().getFullYear();
+                if(viewYear < maxYear) {
+                    viewYear++; 
+                    render(); 
+                }
+            };
+
+            render();
+            
+            // Re-render if the hidden input gets updated programmatically
+            input.addEventListener('change', () => {
+                viewYear = parseInt(input.value.split('-')[0]);
+                render();
+            });
+        }
+
+        // Global click listener to close popovers if clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.custom-month-picker-container')) {
+                document.querySelectorAll('.custom-month-picker-popover').forEach(p => p.classList.remove('show'));
+            }
+        });
+
+
+        // --- State Management & Initialization ---
+        let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+        let monthlyBudget = parseFloat(localStorage.getItem('monthlyBudget')) || 1000;
+        let savingsGoal = JSON.parse(localStorage.getItem('savingsGoal')) || { name: 'Emergency Fund', target: 5000, current: 0 };
+        
+        let currencySymbol = localStorage.getItem('currency') || '₹';
+        document.getElementById('currency').value = currencySymbol;
+        
+        let charts = { category: null, daily: null, ratio: null, historical: null, customMonth: null };
+
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.getElementById('themeBtn').innerText = "Light Mode";
+            Chart.defaults.color = 'rgba(255, 255, 255, 0.4)';
+        } else {
+            Chart.defaults.color = '#787774';
+        }
+
+        // Initialize Dates
+        const today = new Date();
+        document.getElementById('date').value = today.toISOString().slice(0, 10);
+        
+        const monthFilter = document.getElementById('monthFilter');
+        const customMonthFilter = document.getElementById('customMonthFilter');
+        
+        monthFilter.value = today.toISOString().slice(0, 7); 
+        
+        // Ensure the bottom picker default isn't set to the future (e.g., if you opened the app exactly on the 1st of a new year)
+        let lastMonthDate = new Date();
+        lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+        customMonthFilter.value = lastMonthDate.toISOString().slice(0, 7);
+
+        // Turn our hidden inputs into awesome popover calendars
+        attachCustomPicker('monthFilterContainer', 'monthFilter');
+        attachCustomPicker('customMonthFilterContainer', 'customMonthFilter');
+
+        // --- Event Listeners ---
+        document.getElementById('type').addEventListener('change', function(e) {
+            const categorySelect = document.getElementById('category');
+            if (e.target.value === 'income') categorySelect.value = 'Salary';
+            else categorySelect.value = 'Food';
+        });
+
+        document.getElementById('currency').addEventListener('change', function(e) {
+            currencySymbol = e.target.value;
+            localStorage.setItem('currency', currencySymbol);
+            updateUI();
+        });
+
+        monthFilter.addEventListener('change', updateUI);
+        customMonthFilter.addEventListener('change', () => updateCustomChart(transactions));
+
+        // CSV Import Logic
+        document.getElementById('importCsv').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const text = event.target.result;
+                const lines = text.split('\n').filter(line => line.trim() !== '');
+                
+                let importCount = 0;
+                
+                for(let i = 1; i < lines.length; i++) {
+                    const line = lines[i];
+                    const parts = line.split(',');
+                    
+                    if (parts.length >= 5) {
+                        const date = parts[0];
+                        const type = parts[1];
+                        const category = parts[2];
+                        const amount = parseFloat(parts[3]);
+                        
+                        let description = parts.slice(4).join(',');
+                        if (description.startsWith('"') && description.endsWith('"')) {
+                            description = description.substring(1, description.length - 1).replace(/""/g, '"');
+                        }
+
+                        if (date && type && category && !isNaN(amount)) {
+                            transactions.push({
+                                id: Date.now() + i,
+                                type: type,
+                                category: category,
+                                amount: amount,
+                                date: date,
+                                description: description
+                            });
+                            importCount++;
+                        }
+                    }
+                }
+                
+                if (importCount > 0) {
+                    localStorage.setItem('transactions', JSON.stringify(transactions));
+                    updateUI();
+                    alert(`Successfully imported ${importCount} transactions!`);
+                } else {
+                    alert("No valid transactions found in the file.");
+                }
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        });
+
+        // --- Core Functions ---
+        function toggleTheme() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+                document.getElementById('themeBtn').innerText = "Dark Mode";
+                Chart.defaults.color = '#787774';
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                document.getElementById('themeBtn').innerText = "Light Mode";
+                Chart.defaults.color = 'rgba(255, 255, 255, 0.4)';
+            }
+            updateUI(); 
+        }
+
+        function setBudget() {
+            const newBudget = prompt(`Enter your new monthly budget limit (${currencySymbol}):`, monthlyBudget);
+            if (newBudget && !isNaN(newBudget) && newBudget > 0) {
+                monthlyBudget = parseFloat(newBudget);
+                localStorage.setItem('monthlyBudget', monthlyBudget);
+                updateUI();
+            }
+        }
+
+        function editGoal() {
+            const newName = prompt("What are you saving for? (e.g., Vacation, Laptop)", savingsGoal.name);
+            if (!newName) return;
+            const newTarget = prompt(`Enter your target amount for ${newName} (${currencySymbol}):`, savingsGoal.target);
+            if (newTarget && !isNaN(newTarget) && newTarget > 0) {
+                savingsGoal.name = newName;
+                savingsGoal.target = parseFloat(newTarget);
+                localStorage.setItem('savingsGoal', JSON.stringify(savingsGoal));
+                updateUI();
+            }
+        }
+
+        function addSavings() {
+            const amount = prompt(`Awesome! How much money (${currencySymbol}) do you want to add to your goal?`);
+            if (amount && !isNaN(amount) && amount > 0) {
+                savingsGoal.current += parseFloat(amount);
+                
+                if(savingsGoal.current >= savingsGoal.target) {
+                    savingsGoal.current = savingsGoal.target;
+                    confetti({
+                        particleCount: 200,
+                        spread: 100,
+                        origin: { y: 0.6 },
+                        colors: ['#2eaadc', '#0f7b6c', '#d9730d', '#6940a5']
+                    });
+                }
+                
+                localStorage.setItem('savingsGoal', JSON.stringify(savingsGoal));
+                updateUI();
+            }
+        }
+
+        function resetGoal() {
+            if (confirm("Are you sure you want to reset your saved amount to 0?")) {
+                savingsGoal.current = 0;
+                localStorage.setItem('savingsGoal', JSON.stringify(savingsGoal));
+                updateUI();
+            }
+        }
+
+        function downloadExcel() {
+            if (transactions.length === 0) return alert("No transactions to download!");
+            let csvContent = "Date,Type,Category,Amount,Description\n";
+            const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+            sorted.forEach(t => {
+                const safeDescription = `"${t.description.replace(/"/g, '""')}"`;
+                csvContent += `${t.date},${t.type},${t.category},${t.amount},${safeDescription}\n`;
+            });
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "Expense_Tracker_Data.csv";
+            link.click();
+        }
+
+        document.getElementById('tracker-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const dateVal = document.getElementById('date').value;
+            const typeVal = document.getElementById('type').value;
+
+            transactions.push({
+                id: Date.now(),
+                type: typeVal,
+                category: document.getElementById('category').value,
+                amount: parseFloat(document.getElementById('amount').value),
+                date: dateVal,
+                description: document.getElementById('description').value
+            });
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+            
+            // Update filter and trigger its custom change event
+            monthFilter.value = dateVal.slice(0, 7);
+            monthFilter.dispatchEvent(new Event('change'));
+            
+            this.reset();
+            document.getElementById('date').value = dateVal; 
+            document.getElementById('type').value = typeVal; 
+            updateUI();
+        });
+
+        function deleteTransaction(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+            updateUI();
+        }
+
+        // --- UI & Chart Update ---
+        function updateUI() {
+            const selectedMonth = monthFilter.value; 
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            let [year, month] = selectedMonth.split('-');
+            let displayDate = new Date(year, month - 1);
+            document.getElementById('display-month').innerText = displayDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            
+            document.getElementById('amount-label').innerText = `Amount (${currencySymbol})`;
+
+            let filteredTransactions = transactions.filter(t => t.date.startsWith(selectedMonth));
+            if (searchTerm) {
+                filteredTransactions = filteredTransactions.filter(t => 
+                    t.description.toLowerCase().includes(searchTerm) || 
+                    t.category.toLowerCase().includes(searchTerm)
+                );
+            }
+            filteredTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            const list = document.getElementById('transaction-list');
+            list.innerHTML = '';
+            let income = 0, expense = 0;
+
+            if(filteredTransactions.length === 0) {
+                list.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding: 20px;">No transactions found.</p>`;
+            }
+
+            filteredTransactions.forEach(t => {
+                if(t.type === 'income') income += t.amount; else expense += t.amount;
+                const li = document.createElement('li');
+                li.className = t.type;
+                li.innerHTML = `
+                    <div>
+                        <strong style="font-weight: 600;">${t.description}</strong> <span style="font-size:12px; color:var(--text-muted); margin-left: 4px;">(${t.category})</span><br>
+                        <small style="color:var(--text-muted);">${t.date}</small>
+                    </div>
+                    <div style="text-align: right; display: flex; align-items: center; gap: 12px;">
+                        <span style="font-weight: 600; font-size: 15px; color: ${t.type === 'income' ? 'var(--success)' : 'var(--text-main)'}">
+                            ${t.type === 'income' ? '+' : '-'}${currencySymbol}${t.amount.toFixed(2)}
+                        </span>
+                        <button class="delete-btn" onclick="deleteTransaction(${t.id})">Delete</button>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+
+            const balance = income - expense;
+            document.getElementById('total-income').innerText = `+${currencySymbol}${income.toFixed(2)}`;
+            document.getElementById('total-expense').innerText = `-${currencySymbol}${expense.toFixed(2)}`;
+            document.getElementById('net-balance').innerText = (balance >= 0 ? currencySymbol : `-${currencySymbol}`) + Math.abs(balance).toFixed(2);
+            document.getElementById('net-balance').style.color = balance >= 0 ? 'var(--success)' : 'var(--danger)';
+
+            const trueMonthlyExpense = transactions.filter(t => t.date.startsWith(selectedMonth) && t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+            document.getElementById('budget-display').innerText = `${currencySymbol}${monthlyBudget.toFixed(2)}`;
+            const budgetPercentage = Math.min((trueMonthlyExpense / monthlyBudget) * 100, 100);
+            const budgetBar = document.getElementById('budget-bar');
+            budgetBar.style.width = budgetPercentage + '%';
+            document.getElementById('budget-status').innerText = `${budgetPercentage.toFixed(1)}% used`;
+
+            if (budgetPercentage < 50) budgetBar.style.backgroundColor = 'var(--success)';
+            else if (budgetPercentage < 85) budgetBar.style.backgroundColor = 'var(--warning)';
+            else budgetBar.style.backgroundColor = 'var(--danger)';
+
+            document.getElementById('goal-name-display').innerText = savingsGoal.name;
+            document.getElementById('goal-display').innerText = `${currencySymbol}${savingsGoal.current.toFixed(0)} / ${currencySymbol}${savingsGoal.target.toFixed(0)}`;
+            const goalPercentage = Math.min((savingsGoal.current / savingsGoal.target) * 100, 100);
+            document.getElementById('goal-bar').style.width = goalPercentage + '%';
+            document.getElementById('goal-status').innerText = `${goalPercentage.toFixed(1)}%`;
+
+            updateCharts(filteredTransactions, transactions, income, expense);
+            updateCustomChart(transactions);
+        }
+
+        // --- Custom Chart Dual Line Graph ---
+        function updateCustomChart(allTransactions) {
+            const selectedCustomMonth = customMonthFilter.value;
+            if (!selectedCustomMonth) return;
+            
+            let [year, month] = selectedCustomMonth.split('-');
+            let customDate = new Date(year, month - 1);
+            let monthNameDisplay = customDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            
+            document.getElementById('customMonthName').innerText = monthNameDisplay;
+            
+            const customMonthTxns = allTransactions.filter(t => t.date.startsWith(selectedCustomMonth));
+            
+            const dailyIncome = {};
+            const dailyExpense = {};
+            const allDatesSet = new Set();
+
+            customMonthTxns.forEach(t => {
+                allDatesSet.add(t.date);
+                if (t.type === 'income') {
+                    dailyIncome[t.date] = (dailyIncome[t.date] || 0) + t.amount;
+                } else {
+                    dailyExpense[t.date] = (dailyExpense[t.date] || 0) + t.amount;
+                }
+            });
+
+            const sortedDates = Array.from(allDatesSet).sort();
+            const incomeData = sortedDates.map(date => dailyIncome[date] || 0);
+            const expenseData = sortedDates.map(date => dailyExpense[date] || 0);
+            
+            if(charts.customMonth) charts.customMonth.destroy();
+            
+            const emptyColor = document.documentElement.getAttribute('data-theme') === 'dark' ? '#373737' : '#e9e9e7';
+            
+            charts.customMonth = new Chart(document.getElementById('customMonthChart'), {
+                type: 'line',
+                data: {
+                    labels: sortedDates.length ? sortedDates.map(d => d.slice(-2)) : ['No Data'],
+                    datasets: [
+                        {
+                            label: `Credit (Income) ${currencySymbol}`,
+                            data: sortedDates.length ? incomeData : [0],
+                            borderColor: '#0f7b6c', 
+                            backgroundColor: 'rgba(15, 123, 108, 0.1)',
+                            fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#0f7b6c'
+                        },
+                        {
+                            label: `Debit (Expense) ${currencySymbol}`,
+                            data: sortedDates.length ? expenseData : [0],
+                            borderColor: '#e03e3e', 
+                            backgroundColor: 'rgba(224, 62, 62, 0.1)',
+                            fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e03e3e'
+                        }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    scales: { 
+                        y: { beginAtZero: true, grid: { color: emptyColor } }, 
+                        x: { grid: { display: false } } 
+                    },
+                    plugins: { legend: { labels: { font: { family: "ui-sans-serif, -apple-system, BlinkMacSystemFont", weight: '500' } } } }
+                }
+            });
+        }
+
+        function updateCharts(filteredTransactions, allTransactions, totalIncome, totalExpense) {
+            const commonOptions = { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { font: { family: "ui-sans-serif, -apple-system, BlinkMacSystemFont", weight: '500' } } }
+                }
+            };
+
+            const chartColors = ['#2eaadc', '#0f7b6c', '#d9730d', '#e03e3e', '#6940a5', '#787774'];
+            const emptyColor = document.documentElement.getAttribute('data-theme') === 'dark' ? '#373737' : '#e9e9e7';
+
+            const expenseData = filteredTransactions.filter(t => t.type === 'expense');
+            const categories = {};
+            expenseData.forEach(t => categories[t.category] = (categories[t.category] || 0) + t.amount);
+
+            if(charts.category) charts.category.destroy();
+            charts.category = new Chart(document.getElementById('categoryChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(categories).length ? Object.keys(categories) : ['No Data'],
+                    datasets: [{
+                        data: Object.keys(categories).length ? Object.values(categories) : [1],
+                        backgroundColor: Object.keys(categories).length ? chartColors : [emptyColor],
+                        borderWidth: 0
+                    }]
+                },
+                options: { ...commonOptions, cutout: '75%' }
+            });
+
+            const dailyData = {};
+            expenseData.forEach(t => dailyData[t.date] = (dailyData[t.date] || 0) + t.amount);
+            const sortedDates = Object.keys(dailyData).sort();
+            
+            if(charts.daily) charts.daily.destroy();
+            charts.daily = new Chart(document.getElementById('dailyChart'), {
+                type: 'line',
+                data: {
+                    labels: sortedDates.length ? sortedDates.map(d => d.slice(-2)) : ['No Data'],
+                    datasets: [{
+                        label: `Daily Spending (${currencySymbol})`,
+                        data: sortedDates.length ? sortedDates.map(date => dailyData[date]) : [0],
+                        borderColor: '#2eaadc',
+                        backgroundColor: 'rgba(46, 170, 220, 0.1)',
+                        fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#2eaadc'
+                    }]
+                },
+                options: { ...commonOptions, scales: { y: { beginAtZero: true, grid: { color: emptyColor } }, x: { grid: { display: false } } } }
+            });
+
+            if(charts.ratio) charts.ratio.destroy();
+            charts.ratio = new Chart(document.getElementById('ratioChart'), {
+                type: 'pie',
+                data: {
+                    labels: (totalIncome === 0 && totalExpense === 0) ? ['No Data'] : ['Income', 'Expenses'],
+                    datasets: [{
+                        data: (totalIncome === 0 && totalExpense === 0) ? [1] : [totalIncome, totalExpense],
+                        backgroundColor: (totalIncome === 0 && totalExpense === 0) ? [emptyColor] : ['#0f7b6c', '#e03e3e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: commonOptions
+            });
+
+            const monthlyData = {};
+            allTransactions.forEach(t => {
+                const m = t.date.slice(0, 7); 
+                if (!monthlyData[m]) monthlyData[m] = { income: 0, expense: 0 };
+                monthlyData[m][t.type] += t.amount;
+            });
+            const sortedMonths = Object.keys(monthlyData).sort();
+
+            if(charts.historical) charts.historical.destroy();
+            charts.historical = new Chart(document.getElementById('historicalChart'), {
+                type: 'bar',
+                data: {
+                    labels: sortedMonths.length ? sortedMonths : ['Current'],
+                    datasets: [
+                        { label: 'Income', data: sortedMonths.map(m => monthlyData[m].income), backgroundColor: '#0f7b6c', borderRadius: 2 },
+                        { label: 'Expense', data: sortedMonths.map(m => monthlyData[m].expense), backgroundColor: '#e03e3e', borderRadius: 2 }
+                    ]
+                },
+                options: { ...commonOptions, scales: { y: { beginAtZero: true, grid: { color: emptyColor } }, x: { grid: { display: false } } }, barPercentage: 0.6 }
+            });
+        }
+        // Register the Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => {
+                        console.log('PWA Service Worker registered successfully!');
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // Initialize App
+        updateUI();
+    </script>
+</body>
+</html>
